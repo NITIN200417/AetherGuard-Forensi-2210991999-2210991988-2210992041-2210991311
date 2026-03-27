@@ -34,7 +34,8 @@ yarn-debug.log*
 yarn-error.log*
 
 # Models & Large Data (Forensic Policy)
-/models/**
+/models/cache/
+/models/__pycache__/
 /datasets/**
 /temp_uploads/**
 !/temp_uploads/.gitkeep
