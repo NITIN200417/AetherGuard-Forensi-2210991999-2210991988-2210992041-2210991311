@@ -1,0 +1,11 @@
+Model: umm-maybe/AI-image-detector (Fake ID: 0)
+  REAL -> Fake Prob: 1.52%
+  FAKE -> Fake Prob: 4.69%
+
+Model: dima806/deepfake_vs_real_image_detection (Fake ID: 1)
+  REAL -> Fake Prob: 0.38%
+  FAKE -> Fake Prob: 98.77%
+
+Model: prithivMLmods/Deep-Fake-Detector-v2-Model (Fake ID: 1)
+  REAL -> Fake Prob: 76.66%
+  FAKE -> Fake Prob: 62.67%
