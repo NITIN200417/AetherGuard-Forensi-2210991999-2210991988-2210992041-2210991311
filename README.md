@@ -1,5 +1,8 @@
 # AetherGuard Forensic | Deepfake Detection beyond Gravity (V5)
 
+[![Deploy with Vercel](https://vercel.com/button)](https://aetherguard-forensic-v5.vercel.app)
+> **🚀 Live Demo**: [aetherguard-forensic-v5.vercel.app](https://aetherguard-forensic-v5.vercel.app)
+
 AetherGuard is a production-grade AI forensic suite designed for high-fidelity deconvolution of digital media. It utilizes an ensemble of EfficientNet-B4 and Vision Transformer architectures to identify biometric anomalies, optical misalignments, and generative artifacts in images, temporal video streams, and live optical sensors.
 
 ---
