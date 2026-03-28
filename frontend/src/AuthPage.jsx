@@ -10,6 +10,9 @@ import {
 const OTP_LENGTH = 6;
 const OTP_COOLDOWN = 30;
 
+// OTP Server endpoint — running via nodemon on port 4000
+const OTP_API = 'http://localhost:4000';
+
 const AuthPage = ({ onLogin, initialMode = 'login' }) => {
   const [isLogin, setIsLogin] = useState(initialMode === 'login');
   const [step, setStep] = useState('identify'); // 'identify' or 'otp'
@@ -19,9 +22,11 @@ const AuthPage = ({ onLogin, initialMode = 'login' }) => {
   const [timer, setTimer] = useState(0);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [serverStatus, setServerStatus] = useState('checking'); // 'checking' | 'online' | 'demo'
   
   const otpRefs = useRef([]);
 
+  // ── Countdown timer ────────────────────────────────────────────────────────
   useEffect(() => {
     let interval;
     if (timer > 0) {
@@ -30,22 +35,48 @@ const AuthPage = ({ onLogin, initialMode = 'login' }) => {
     return () => clearInterval(interval);
   }, [timer]);
 
-  const handleSendOTP = (e) => {
+  // ── Check OTP server health on mount ───────────────────────────────────────
+  useEffect(() => {
+    fetch(`${OTP_API}/health`, { signal: AbortSignal.timeout(3000) })
+      .then(r => r.json())
+      .then(data => {
+        setServerStatus(data.smtp === 'configured' ? 'online' : 'demo');
+      })
+      .catch(() => setServerStatus('demo'));
+  }, []);
+
+  // ── Send OTP ───────────────────────────────────────────────────────────────
+  const handleSendOTP = async (e) => {
     if (e) e.preventDefault();
     if (!formData.identifier) return;
-    
+
     setIsLoading(true);
     setError(null);
-    
-    // Mock OTP Send
-    setTimeout(() => {
+
+    try {
+      const res = await fetch(`${OTP_API}/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.identifier }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to transmit OTP.');
+      }
+
       setStep('otp');
       setTimer(OTP_COOLDOWN);
+    } catch (err) {
+      setError(`TRANSMISSION_FAILURE: ${err.message}`);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
-  const handleVerifyOTP = (e) => {
+  // ── Verify OTP ─────────────────────────────────────────────────────────────
+  const handleVerifyOTP = async (e) => {
     if (e) e.preventDefault();
     const otpValue = otp.join('');
     if (otpValue.length < OTP_LENGTH) return;
@@ -53,25 +84,36 @@ const AuthPage = ({ onLogin, initialMode = 'login' }) => {
     setIsLoading(true);
     setError(null);
 
-    // Mock OTP Verification
-    setTimeout(() => {
-      if (otpValue === '123456') { // Mock valid OTP
-        setSuccess(true);
-        setTimeout(() => {
-          onLogin({ 
-            name: isLogin ? (formData.identifier.split('@')[0]) : formData.name, 
-            identifier: formData.identifier 
-          });
-        }, 1500);
-      } else {
-        setError("INVALID_CIPHER_SEQUENCE: AUTH_FAILURE");
-        setIsLoading(false);
-        setOtp(new Array(OTP_LENGTH).fill(''));
-        otpRefs.current[0]?.focus();
+    try {
+      const res = await fetch(`${OTP_API}/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.identifier, otp: otpValue }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Verification failed.');
       }
-    }, 2000);
+
+      // ✅ Verified!
+      setSuccess(true);
+      setTimeout(() => {
+        onLogin({
+          name: isLogin ? formData.identifier.split('@')[0] : formData.name,
+          identifier: formData.identifier,
+        });
+      }, 1500);
+    } catch (err) {
+      setError(`INVALID_CIPHER_SEQUENCE: ${err.message}`);
+      setIsLoading(false);
+      setOtp(new Array(OTP_LENGTH).fill(''));
+      otpRefs.current[0]?.focus();
+    }
   };
 
+  // ── OTP Input handlers ─────────────────────────────────────────────────────
   const handleOtpChange = (element, index) => {
     if (isNaN(element.value)) return;
     const newOtp = [...otp];
@@ -124,6 +166,22 @@ const AuthPage = ({ onLogin, initialMode = 'login' }) => {
               <div className="mt-4 flex items-center gap-3 text-[9px] font-black text-slate-500 tracking-[0.4em] uppercase">
                  <Scan size={12} className="text-purple-600" /> SECURE_HANDSHAKE_ACTIVE
               </div>
+
+              {/* OTP Server Status Indicator */}
+              <div className={`mt-3 flex items-center gap-2 px-4 py-1.5 rounded-full border text-[9px] font-black uppercase tracking-widest ${
+                serverStatus === 'online' ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-500' :
+                serverStatus === 'demo'   ? 'border-amber-500/30 bg-amber-500/5 text-amber-500' :
+                                            'border-slate-700 bg-white/5 text-slate-600'
+              }`}>
+                <div className={`w-1.5 h-1.5 rounded-full ${
+                  serverStatus === 'online' ? 'bg-emerald-500 shadow-[0_0_6px_#10b981]' :
+                  serverStatus === 'demo'   ? 'bg-amber-500 shadow-[0_0_6px_#f59e0b] animate-pulse' :
+                                              'bg-slate-600 animate-pulse'
+                }`} />
+                {serverStatus === 'online' ? 'OTP_SERVER: EMAIL_ACTIVE' :
+                 serverStatus === 'demo'   ? 'OTP_SERVER: DEMO_MODE (check console)' :
+                                             'OTP_SERVER: CONNECTING...'}
+              </div>
            </div>
 
            <AnimatePresence mode="wait">
@@ -169,11 +227,20 @@ const AuthPage = ({ onLogin, initialMode = 'login' }) => {
                       <div className="relative group">
                          <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-purple-500 transition-colors" size={18} />
                          <input 
-                           type="text" placeholder="COMM_LINK (EMAIL/PHONE)" required
+                           type="email" placeholder="EMAIL_ADDRESS" required
                            value={formData.identifier} onChange={e => setFormData({...formData, identifier: e.target.value})}
                            className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-5 pl-16 pr-6 text-sm font-black text-white focus:outline-none focus:border-purple-500/50 transition-all uppercase tracking-widest italic"
                          />
                       </div>
+
+                      {serverStatus === 'demo' && (
+                        <div className="flex items-start gap-3 p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl">
+                          <Terminal size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                          <p className="text-[9px] font-black text-amber-500/80 uppercase tracking-widest leading-relaxed">
+                            Demo Mode Active — OTP will print to the nodemon console instead of email. Configure <code className="font-mono normal-case">.env</code> to enable real delivery.
+                          </p>
+                        </div>
+                      )}
 
                       <button 
                         type="submit" disabled={isLoading}
@@ -188,6 +255,9 @@ const AuthPage = ({ onLogin, initialMode = 'login' }) => {
                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-8 text-center leading-relaxed">
                             A 6-DIGIT QUANTUM OTP HAS BEEN TRANSMITTED TO:<br/>
                             <span className="text-purple-400 mt-2 block">{formData.identifier}</span>
+                            {serverStatus === 'demo' && (
+                              <span className="text-amber-500 mt-1 block">→ Check nodemon console for the code</span>
+                            )}
                          </p>
                          
                          <div className="flex gap-3 md:gap-4 justify-center">

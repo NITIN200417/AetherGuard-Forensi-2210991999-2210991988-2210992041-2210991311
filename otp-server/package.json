@@ -1,0 +1,30 @@
+{
+  "name": "aetherguard-otp-server",
+  "version": "1.0.0",
+  "description": "AetherGuard OTP Email Authentication Server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "dev:verbose": "nodemon --verbose server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "nodemailer": "^6.9.13",
+    "express-rate-limit": "^7.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  },
+  "nodemonConfig": {
+    "watch": ["server.js", ".env"],
+    "ext": "js,json",
+    "ignore": ["node_modules/"],
+    "delay": "500",
+    "env": {
+      "NODE_ENV": "development"
+    }
+  }
+}
